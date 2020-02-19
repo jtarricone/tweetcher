@@ -15,3 +15,7 @@ A Tweet-Watcher built as an exercise to learn more about `fs2` streams.
   - `docker-compose up api-server` to spin up the Http4s server
 - In a browser, browse to `http://localhost:8080/tweet/stats` to see the summary (refresh to see ongoing results)
   - the API can also be reached with a `curl` or the like, but browsers will render the emojis while terminals often will not
+
+## Example
+
+![Sample](https://github.com/jtarricone/tweetcher/blob/master/misc/example.png)
