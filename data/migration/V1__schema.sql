@@ -1,0 +1,29 @@
+DROP TABLE IF EXISTS twitter_hashtags;
+DROP TABLE IF EXISTS twitter_media;
+DROP TABLE IF EXISTS twitter_tweet;
+DROP TABLE IF EXISTS twitter_tweetmetadata;
+
+CREATE TABLE twitter_tweet(
+  id UUID PRIMARY KEY,
+  timestamp BIGINT NOT NULL,
+  text VARCHAR NOT NULL,
+  photos INT NOT NULL
+);
+
+CREATE TABLE twitter_hashtags(
+  id UUID PRIMARY KEY,
+  text VARCHAR NOT NULL,
+  tweet_id UUID REFERENCES twitter_tweet(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE twitter_urlentity(
+  id UUID PRIMARY KEY,
+  url VARCHAR NOT NULL,
+  tweet_id UUID REFERENCES twitter_tweet(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE twitter_emoji(
+  id UUID PRIMARY KEY,
+  text VARCHAR NOT NULL,
+  tweet_id UUID REFERENCES twitter_tweet(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
