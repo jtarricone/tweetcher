@@ -1,0 +1,113 @@
+version: "2.3"
+services:
+  postgres:
+    image: postgres:11.5
+    volumes:
+      - ./data/:/tmp/data/
+    environment:
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpassword
+      - POSTGRES_DB=tweetcher
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  run-migrations:
+    image: boxfuse/flyway:5.2.4
+    environment:
+      - FLYWAY_DRIVER=org.postgresql.Driver
+      - FLYWAY_URL=jdbc:postgresql://database.service.tweetcher.internal/
+      - FLYWAY_USER=testuser
+      - FLYWAY_PASSWORD=testpassword
+      - FLYWAY_LOCATIONS=filesystem:/opt/data/migration
+      - FLYWAY_SCHEMAS=public
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    links:
+      - postgres:database.service.tweetcher.internal
+    volumes:
+      - ./data/:/opt/data/
+    entrypoint: flyway
+    command:
+      - "migrate"
+      - "-user=testuser"
+      - "-password=testpassword"
+      - "-url=jdbc:postgresql://database.service.tweetcher.internal/tweetcher"
+
+  sbt-compile:
+    command:
+      - "~compile"
+    entrypoint: sbt
+    env_file: .env
+    environment:
+      - COURSIER_CACHE=/root/.coursier
+    image: spikerlabs/scala-sbt
+    volumes:
+      - ./backend:/opt/tweetcher/backend/
+      - ./data/:/opt/data/
+      - ./.bintray:/root/.bintray
+      - ./tmp/:/tmp
+      - $HOME/.sbt:/root/.sbt
+      - $HOME/.coursier:/root/.coursier
+      - $HOME/.ivy2:/root/.ivy2
+    working_dir: /opt/tweetcher/backend/
+
+  api-server:
+    command:
+      - "-Dcom.sun.management.jmxremote.rmi.port=9030"
+      - "-Dcom.sun.management.jmxremote=true"
+      - "-Dcom.sun.management.jmxremote.port=9030"
+      - "-Dcom.sun.management.jmxremote.ssl=false"
+      - "-Dcom.sun.management.jmxremote.authenticate=false"
+      - "-Dcom.sun.management.jmxremote.local.only=false"
+      - "-Djava.rmi.server.hostname=localhost"
+      - "-jar"
+      - "api-assembly-0.0.1.jar"
+    entrypoint: java
+    env_file: .env
+    environment:
+      - HTTP4S_THREADPOOL_THREADS=2
+      - BLAZE_THREADPOOL_THREADS=2
+      - BLAZE_CONNECTOR_POOL_SIZE=4
+      - DB_THREADPOOL_THREADS=2
+      - STREAM_CONCURRENCY=4
+    image: spikerlabs/scala-sbt
+    links:
+      - postgres:database.service.tweetcher.internal
+    ports:
+      - "8080:8080"
+      - "9030:9030"
+    volumes:
+      - ./backend/:/opt/tweetcher/backend/
+      - ./data/:/opt/data/
+      - ./.bintray:/root/.bintray
+    working_dir: /opt/tweetcher/backend/api/target/scala-2.12/
+
+  run-reader:
+    command:
+      - "-jar"
+      - "reader.jar"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: java
+    env_file: .env
+    environment:
+      - DB_THREADPOOL_THREADS=2
+      - STREAM_CONCURRENCY=4
+    image: spikerlabs/scala-sbt
+    links:
+      - postgres:database.service.tweetcher.internal
+    volumes:
+      - ./backend/:/opt/tweetcher/backend/
+      #- ./data/:/opt/data/
+      - ./tmp/:/tmp
+      - ./.bintray:/root/.bintray
+    working_dir: /opt/tweetcher/backend/reader/target/scala-2.12/
